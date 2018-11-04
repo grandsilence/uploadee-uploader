@@ -100,10 +100,8 @@ namespace UploadEeUploader
                 string fileName = Path.GetFileName(filePath);
                 var fileContent = new StreamContent(file);
 
-
                 // Тоже ХАК для upload.ee (привет индусам-программистам) - без него сервер выдаст исключение
                 fileContent.Headers.Add("Content-Disposition", $"form-data; name=\"upfile_0\"; filename=\"{fileName}\"");
-                // fileContent.Headers.Add("Context-Type", "text/plain");
 
                 content = new MultipartFormDataContent("----WebKitFormBoundaryRcbpCXRhM2idX4Yq") {
                     { fileContent, "upfile_0", fileName},
@@ -126,6 +124,7 @@ namespace UploadEeUploader
                     ?? throw new UploadEeException("Не найдена ссылка на загруженный файл");
 
                 return filePreviewUrl;
+
                 // Возможно получать прямую ссылку, но вопрос, не умрет ли она?
                 // html = Get(filePreviewUrl);
                 // return html.Between("<a id=\"d_l\" href=\"", "\" ")
@@ -184,6 +183,4 @@ namespace UploadEeUploader
             _http?.Dispose();
         }
     }
-
-
 }
