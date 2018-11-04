@@ -8,9 +8,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("UploadEeUploader")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("Grand Silence")]
 [assembly: AssemblyProduct("UploadEeUploader")]
-[assembly: AssemblyCopyright("Copyright ©  2018")]
+[assembly: AssemblyCopyright("Copyright © 2018 by Grand Silence")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

@@ -7,9 +7,17 @@ using System.Threading.Tasks;
 
 namespace UploadEeUploader
 {
+    public class UploadEeException : Exception
+    {
+        public UploadEeException(string message) : base(message)
+        {
+        }
+    }
+
     public class UploadEeClient : IDisposable
     {
         private readonly HttpClient _http;
+        private const string BaseUrl = "https://www.upload.ee";
 
         // Время используется как один из параметров запроса.
         public static ulong MillisecondsFrom1970 => (ulong) (DateTime.UtcNow - FirstJanuary1970).TotalMilliseconds;
@@ -24,7 +32,7 @@ namespace UploadEeUploader
                 UseCookies = true,
                 CookieContainer = new CookieContainer(),
                 SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls,
-                // Отладка запросов через Charles (платный) или Fiddler (бесплатный)
+                // Отладка запросов через Charles (платный, но не стоит покупки ибо кривая жуть) или Fiddler (бесплатный)
                 #if CHARLES
                 Proxy = new WebProxy("http://127.0.0.1:8888")
                 #endif
@@ -32,19 +40,17 @@ namespace UploadEeUploader
 
             _http = new HttpClient(handler) {
                 // Все запросы будут относительно этого адреса
-                BaseAddress = new Uri("https://www.upload.ee/"),
+                BaseAddress = new Uri(BaseUrl),
                 // Максимальное время запроса 10 секунд - после будет исключение что нет соединения.
                 Timeout = TimeSpan.FromSeconds(10)
             };
-
             
             // Пытаемся выдать себя за реальный браузер
             _http.DefaultRequestHeaders.ExpectContinue = false;
             _http.DefaultRequestHeaders.UserAgent.TryParseAdd("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3583.0 Safari/537.36");
             _http.DefaultRequestHeaders.AcceptEncoding.TryParseAdd("gzip, deflate, br");
             _http.DefaultRequestHeaders.AcceptLanguage.TryParseAdd("en-US,en;q=0.5");
-            _http.DefaultRequestHeaders.Referrer = new Uri("https://www.upload.ee");
-            // _http.DefaultRequestHeaders.TryAddWithoutValidation("Origin", "https://www.upload.ee");
+            _http.DefaultRequestHeaders.Referrer = _http.BaseAddress;
         }
 
         /// <summary>
@@ -91,14 +97,16 @@ namespace UploadEeUploader
             try
             {
                 file = File.OpenRead(filePath);
+                string fileName = Path.GetFileName(filePath);
                 var fileContent = new StreamContent(file);
 
+
                 // Тоже ХАК для upload.ee (привет индусам-программистам) - без него сервер выдаст исключение
-                fileContent.Headers.Add("Content-Disposition", "form-data; name=\"upfile_0\"; filename=\"" + Path.GetFileName(filePath) + "\"");
+                fileContent.Headers.Add("Content-Disposition", $"form-data; name=\"upfile_0\"; filename=\"{fileName}\"");
                 // fileContent.Headers.Add("Context-Type", "text/plain");
 
                 content = new MultipartFormDataContent("----WebKitFormBoundaryRcbpCXRhM2idX4Yq") {
-                    { fileContent, "upfile_0", Path.GetFileName(filePath)},
+                    { fileContent, "upfile_0", fileName},
                     // Внимание: имя поля с кавычками не просто так. Без них сервер почему-то кидает ошибку XML парсинга (кто-то не умеет писать код).
                     { new StringContent(""), "\"link\"" },
                     { new StringContent(""), "\"email\"" },
@@ -107,18 +115,21 @@ namespace UploadEeUploader
                     { new StringContent("120x90"), "\"small_resize\"" }
                 };
 
-
+                // Закачиваем файл на сервер
                 string html = Post(uploadUrl, content);
                 if (!html.Contains(finishUrl))
                     throw new UploadEeException("Не удалось загрузить файл по неизвестной причине");
 
-                        // _http.DefaultRequestHeaders.Referrer = new Uri("https://www.upload.ee" + uploadUrl); 
+                // Получаем HTML со ссылкой на предпросмотр загруженного файла
                 html = Get(finishUrl + uploadId);
-
-
-                // Получаем результирующую ссылку
-                return html.Between("Файл можно увидеть здесь:<br /><a href=\"", "\">")
+                string filePreviewUrl = html.Between("Файл можно увидеть здесь:<br /><a href=\"", "\">")
                     ?? throw new UploadEeException("Не найдена ссылка на загруженный файл");
+
+                return filePreviewUrl;
+                // Возможно получать прямую ссылку, но вопрос, не умрет ли она?
+                // html = Get(filePreviewUrl);
+                // return html.Between("<a id=\"d_l\" href=\"", "\" ")
+                //    ?? throw new UploadEeException("Не удалось найти прямую ссылку на файл. Только preview.");
             }
             finally
             {
@@ -150,7 +161,7 @@ namespace UploadEeUploader
         }
 
         /// <summary>
-        /// Синхронное чтение ответа.
+        /// Синхронное чтение ответа в строку.
         /// </summary>
         /// <param name="task">Задача с HTTP ответом содержимое которой нужно прочитать.</param>
         /// <returns>Ответ от сервера в виде строки</returns>
@@ -173,4 +184,6 @@ namespace UploadEeUploader
             _http?.Dispose();
         }
     }
+
+
 }
