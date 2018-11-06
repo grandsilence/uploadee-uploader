@@ -120,15 +120,12 @@ namespace UploadEeUploader
 
                 // Получаем HTML со ссылкой на предпросмотр загруженного файла
                 html = Get(finishUrl + uploadId);
-                string filePreviewUrl = html.Between("Файл можно увидеть здесь:<br /><a href=\"", "\">")
+                string filePreviewUrl = html.Between("<br /><a href=\"", "\">")
                     ?? throw new UploadEeException("Не найдена ссылка на загруженный файл");
 
-                return filePreviewUrl;
-
                 // Возможно получать прямую ссылку, но вопрос, не умрет ли она?
-                // html = Get(filePreviewUrl);
-                // return html.Between("<a id=\"d_l\" href=\"", "\" ")
-                //    ?? throw new UploadEeException("Не удалось найти прямую ссылку на файл. Только preview.");
+                html = Get(filePreviewUrl);
+                return html.Between("<a id=\"d_l\" href=\"", "\" ") ?? filePreviewUrl;
             }
             finally
             {
